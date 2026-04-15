@@ -1,0 +1,94 @@
+# =============================================================================
+# openmetadata — custom values for local development
+#
+# Chart   : open-metadata/openmetadata
+# Version : 1.12.5
+#
+# Depends on the openmetadata-dependencies release being already deployed
+# with release name "openmetadata-dependencies" (see deps-values.yaml).
+# =============================================================================
+
+image:
+  repository: openmetadata/server
+  tag: 1.12.5
+  pullPolicy: IfNotPresent
+
+replicaCount: 1
+
+openmetadata:
+  config:
+    clusterName: local-dev
+
+    database:
+      host: mysql
+      port: 3306
+      driverClass: com.mysql.cj.jdbc.Driver
+      dbScheme: mysql
+      databaseName: openmetadata_db
+      dbParams: "allowPublicKeyRetrieval=true&useSSL=false"
+      auth:
+        username: openmetadata_user
+        password:
+          secretRef: mysql-secrets
+          secretKey: openmetadata-mysql-password
+
+    elasticsearch:
+      host: opensearch
+      port: 9200
+      scheme: http
+      connectionTimeoutSecs: 5
+      socketTimeoutSecs: 60
+      batchSize: 10
+      searchType: opensearch
+
+    pipelineServiceClientConfig:
+      enabled: true
+      apiEndpoint: "http://openmetadata-dependencies-api-server:8080"
+      metadataApiEndpoint: "http://openmetadata:8585/api"
+      hostIp: ""
+      healthCheckInterval: 300
+      auth:
+        username: admin
+        password:
+          secretRef: airflow-secrets
+          secretKey: openmetadata-airflow-password
+
+    authentication:
+      provider: basic
+      authority: "http://openmetadata:8585/api/v1/system/config/jwks"
+      callbackUrl: "http://localhost:8585/callback"
+      enableSelfSignup: true
+
+    authorizer:
+      className: "org.openmetadata.service.security.DefaultAuthorizer"
+      containerRequestFilter: "org.openmetadata.service.security.JwtFilter"
+      initialAdmins:
+        - admin
+      principalDomain: "openmetadata.org"
+
+    web:
+      uriPath: "/api"
+
+resources:
+  requests:
+    memory: "512Mi"
+    cpu: "200m"
+  limits:
+    memory: "2Gi"
+    cpu: "1000m"
+
+service:
+  type: ClusterIP
+  port: 8585
+  adminPort: 8586
+  annotations: {}
+
+readinessProbe:
+  initialDelaySeconds: 60
+  periodSeconds: 15
+  failureThreshold: 10
+
+livenessProbe:
+  initialDelaySeconds: 80
+  periodSeconds: 30
+  failureThreshold: 5

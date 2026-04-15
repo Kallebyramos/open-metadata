@@ -1,0 +1,162 @@
+# =============================================================================
+# openmetadata-dependencies — custom values for local development
+#
+# Chart   : open-metadata/openmetadata-dependencies
+# Bundles : MySQL 8, OpenSearch 2, Apache Airflow 3.1.7
+#
+# Compatible with OpenMetadata 1.12.5
+# Airflow version is set to 3.1.7 (pinned by OM ingestion/setup.py for 1.12.x)
+# =============================================================================
+
+mysql:
+  enabled: true
+
+  auth:
+    rootPassword: "openmetadata_password"
+    
+  initdbScripts:
+    init_airflow_db_scripts.sql: |
+      CREATE DATABASE IF NOT EXISTS airflow_db CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+      CREATE USER IF NOT EXISTS 'airflow_user'@'%' IDENTIFIED BY 'airflow_pass';
+      GRANT ALL PRIVILEGES ON airflow_db.* TO 'airflow_user'@'%' WITH GRANT OPTION;
+      commit;
+    init_openmetadata_db_scripts.sql: |
+      CREATE DATABASE IF NOT EXISTS openmetadata_db;
+      CREATE USER IF NOT EXISTS 'openmetadata_user'@'%' IDENTIFIED BY 'openmetadata_password';
+      GRANT ALL PRIVILEGES ON openmetadata_db.* TO 'openmetadata_user'@'%' WITH GRANT OPTION;
+      commit;
+
+  # Single instance is enough locally
+  primary:
+    persistence:
+      size: 5Gi
+    resources:
+      requests:
+        memory: "256Mi"
+        cpu: "100m"
+      limits:
+        memory: "1Gi"
+        cpu: "500m"
+
+opensearch:
+  enabled: true
+
+  # Single-node cluster for local use
+  replicas: 1
+  minimumMasterNodes: 1
+
+  persistence:
+    size: 5Gi
+
+  resources:
+    requests:
+      memory: "512Mi"
+      cpu: "100m"
+    limits:
+      memory: "1.5Gi"
+      cpu: "500m"
+
+  # Disable security plugin for local simplicity
+  config:
+    opensearch.yml: |
+      plugins.security.disabled: true
+
+  extraEnvs:
+    - name: DISABLE_INSTALL_DEMO_CONFIG
+      value: "true"
+    - name: DISABLE_SECURITY_PLUGIN
+      value: "true"
+
+airflow:
+  enabled: true
+
+  # Image tag matches the pinned Airflow version
+  defaultAirflowTag: "3.1.7"
+  airflowVersion: "3.1.7"
+
+  images:
+    airflow:
+      repository: openmetadata/ingestion
+      tag: 1.12.5
+      pullPolicy: IfNotPresent
+
+  executor: LocalExecutor
+
+  migrateDatabaseJob:
+    enabled: true
+
+  # Use MySQL as the Airflow metadata DB (same MySQL instance as OM).
+  data:
+    metadataConnection:
+      protocol: mysql+mysqldb
+      host: "mysql"
+      port: 3306
+      db: airflow_db
+      user: airflow_user
+      pass: "airflow_pass"
+      sslmode: disable
+
+  # Airflow Web UI credentials
+  webserverSecretKey: "openmetadata-is-cool"
+
+  web:
+    resources:
+      requests:
+        memory: "256Mi"
+        cpu: "100m"
+      limits:
+        memory: "1Gi"
+        cpu: "500m"
+
+  scheduler:
+    resources:
+      requests:
+        memory: "256Mi"
+        cpu: "100m"
+      limits:
+        memory: "1Gi"
+        cpu: "500m"
+
+  workers:
+    resources:
+      requests:
+        memory: "256Mi"
+        cpu: "100m"
+      limits:
+        memory: "1Gi"
+        cpu: "500m"
+
+  # Create the default admin user for the Airflow UI
+  webserver:
+    defaultUser:
+      enabled: true
+      role: Admin
+      username: admin
+      email: admin@openmetadata.org
+      firstName: OpenMetadata
+      lastName: Admin
+      password: admin
+
+  # Disable Flower (not needed locally)
+  flower:
+    enabled: false
+
+  # Disable Redis (not needed for LocalExecutor)
+  redis:
+    enabled: false
+
+  # Disable StatsD
+  statsd:
+    enabled: false
+
+  # Persist DAGs on a PVC so OM can write them from the UI
+  dags:
+    persistence:
+      enabled: true
+      size: 2Gi
+      # ReadWriteOnce is fine for LocalExecutor - For prd instances you need to use readwritemany
+      accessMode: ReadWriteOnce
+
+  logs:
+    persistence:
+      enabled: false
